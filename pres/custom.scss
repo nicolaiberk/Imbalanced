@@ -1,0 +1,44 @@
+/*-- scss:defaults --*/
+
+// fonts
+$link-color: #90249f;
+$bg-color: #ffffff;
+$code-block-border-left: true;
+
+/*-- scss:rules --*/
+
+.code_block1 {
+  font: 1.5em;
+}
+.reveal .slide blockquote {
+  border-left: 3px solid $text-muted;
+  padding-left: 0.5em;
+}
+
+b, strong {
+  color: $link-color;
+  }
+
+mark {
+  background-color: $link-color;
+  color: $bg-color;
+}
+
+.right {
+  text-align: right;
+}
+
+div.callout-ipl.callout {
+  border-left-color: $link-color;
+}
+
+div.callout-ipl.callout-style-default>.callout-header {
+  background-color: $link-color;
+}
+
+.reveal .slide-logo {
+  height: 50px !important;
+  width: 200px!important;
+  max-width: unset !important;
+  max-height: unset !important;
+}

@@ -1,0 +1,765 @@
+---
+title: "Imbalanced Learning"
+subtitle: "How to Deal with Imbalanced Data in Supervised Classification Problems"
+author: "Nicolai Berk"
+institute: "Dynamics RTG & Humboldt Universität Berlin"
+date: "2023-05-11"
+date-format: "DD.MM.YYYY"
+logo: vis/comptext.png
+footer: "Nicolai Berk | Imbalanced Data"
+format: 
+  revealjs:
+    theme: [simple, custom.scss]
+    embed-resources: true
+    preview-links: true
+editor: visual
+bibliography: "C:/Users/nicol/Dropbox/Studium/BibTex/PhD.bib"
+---
+
+## Hi
+
+
+```{r setup}
+
+library(tidyverse)
+library(dplyr)
+library(data.table)
+library(fixest)
+library(lubridate)
+library(patchwork)
+library(icons)
+
+themecols = c("gray", "#90249f")
+
+```
+
+<br>
+
+### I am Nicolai Berk
+
+
+- PhD Candidate at Dynamics RTG & HU Berlin
+- Interest in Political Communication, esp. Media Effects & Text Analysis
+- Using **R** & **Python**
+
+## About this Class
+
+<br>
+
+::: {.columns}
+::: {.column width="70%"}
+
+- Some familiarity with Python expected
+- Supervised ML = Bag-of-Words
+- Access slides via [nicolaiberk.com $\rightarrow$ Imbalanced Data Workshop](https://nicolaiberk.com/posts/imbalance.html)
+
+:::
+:::
+
+```{r slides, echo=FALSE, fig.align="right"}
+code <- qrcode::qr_code("https://nicolaiberk.com/posts/imbalance.html")
+plot(code)
+
+```
+
+## Schedule {.scrollable}
+
+| Time frame | Topic |
+|:------------- | -------------- | 
+|**13:30-14:15** | Intro to Supervised ML in Python | 
+| | Showcase of `scikit-learn` | 
+| | Small Coding Challenge | 
+|**Break** | | 
+|**14:30-15:15** | Imbalance as a *Sampling Problem* |
+| | Theory behind Active Learning |
+| | Application of Active Learning |
+|**Break** | |
+|**15:45-16:30** | Imbalance as a *Weighting Problem* |
+| | Theory behind SMOTE |
+| | Application of SMOTE |
+| | If time: Current Debates |
+
+# A Quick Introduction to Supervised Learning for Text Analysis (in Python)
+
+---
+
+<br>
+
+### Supervised learning (A **very** precise definition):
+
+<br> <br>
+
+> We know stuff about some documents and want to know the same stuff about other documents.
+
+
+
+## Some Lingo
+
+<br>
+
+| Term  | Meaning  |
+| :-------- | :----------------------------- |
+| **Classifier** | a statistical model fitted to some data to make predictions about different data. |
+| **Training** | The process of fitting the classifier to the data. |
+| **Train and test set** | Datasets used to train and evaluate the classifier. |
+| **Vectorizer** | A tool used to translate text into numbers. |
+
+
+## The Classic Pipeline for Text Classification (BoW)
+
+<br>
+
+::: {.incremental}
+0. Annotate subset.
+1. Divide into training- and test-set.
+2. Transform to Document-Term-Matrix.
+3. Fit model.
+4. Predict.
+5. Evaluate.
+:::
+
+. . .
+
+![](https://scikit-learn.org/stable/_static/scikit-learn-logo-small.png){
+  .absolute bottom=130 right=250 height=100
+}
+
+
+## 0. Annotation
+
+<br>
+
+- We need data from which to learn.
+- Assign labels to documents.
+- **Usually** randomly sampled.
+
+## 0. Annotation
+
+
+```{r docs}
+
+doc_1 <- 
+  fontawesome("file", style = "solid") %>% 
+  icon_style(scale = 2, fill = "gray")
+
+doc_2 <-
+  fontawesome("file", style = "solid") %>% 
+  icon_style(scale = 2, fill = "#90249f")
+  
+
+```
+
+
+`r doc_1` | `r doc_2` | `r doc_1` | `r doc_1` | `r doc_2`
+--------- | --------- | --------- | --------- | ---------
+`r doc_1` | `r doc_1` | `r doc_2` | `r doc_2` | `r doc_2`
+`r doc_1` | `r doc_2` | `r doc_1` | `r doc_1` | `r doc_1`
+`r doc_2` | `r doc_1` | `r doc_1` | `r doc_1` | `r doc_2`
+
+## 1. Divide into Training- and Test-Set
+
+<br>
+
+```{.python code-line-numbers="|1|3|4|5|6|7"}
+from sklearn.model_selection import train_test_split
+
+X_train, X_test, y_train, y_test = train_test_split(
+  X, 
+  y, 
+  test_size=0.33, 
+  random_state=42)
+
+```
+
+
+## 2. Transformation
+
+<br>
+
+Statistical models can only read numbers 
+
+$\rightarrow$ we need to **translate!**
+
+. . .
+
+### Classic DFM
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+ID | Text
+-- | -----
+1  | This is a text
+2  | This is no text
+
+:::
+
+::: {.column width="50%"}
+
+ID | This | is | a | text | no |
+-- | ---- | -- | - | ---- | -- |
+1  | 1    | 1  | 1 | 1    | 0  |
+2  | 1    | 1  | 0 | 1    | 1  |
+
+:::
+:::
+
+## 2. Transformation - in `sklearn`
+
+<br>
+
+### Transform text into Document-Term-Matrix
+
+<br>
+
+```{.python code-line-numbers="|1,2|1-3|5,6"}
+## import vectorizer
+from sklearn.feature_extraction.text import CountVectorizer
+vectorizer = CountVectorizer()
+
+## fit vectorizer & transform text
+sparse_mtrx = vectorizer.fit_transform(X_train)
+
+```
+
+## 3. Fit model.
+
+<br><br>
+
+```{.python}
+## import the model
+from sklearn.linear_model import LogisticRegression
+clsfr = LogReg()
+
+## fit the classifier
+clsfr.fit(sparse_mtrx)
+
+```
+
+
+
+## 4. Predict.
+
+<br><br>
+```{r}
+
+
+data.frame(
+  review = c("great movie!", 
+             "what a bunch of cr*p",
+             "I lost all faith in humanity after watching this"),
+  label = c("?", "?", "?")
+) %>% 
+  knitr::kable()
+
+```
+
+
+# 4. Predict - in `sklearn`
+
+```{.python code-line-numbers="1|2"}
+X_test = vec.transform(X_test)
+y_pred = clsfr.predict(X_test)
+
+```
+
+. . .
+
+```{r}
+
+data.frame(
+  review = c("great movie!", 
+             "what a bunch of cr*p",
+             "I lost all faith in humanity after watching this"),
+  label = c("good", "bad", "bad")
+) %>% 
+  knitr::kable()
+
+```
+
+
+## 5. Evaluation
+
+<br>
+
+### Confusion Matrix
+
+```{r confusion}
+
+actual <- as.logical(rbinom(1000, 1, 0.3))
+pred <- actual
+pred[sample(1:1000, 50)] <- F
+pred[sample(1:1000, 50)] <- T
+
+knitr::kable(table(pred, actual))
+
+```
+
+
+
+
+## 5. Evaluation {.smaller}
+
+::: {.columns}
+
+::: {.column width="30%"}
+
+![](https://upload.wikimedia.org/wikipedia/commons/thumb/2/26/Precisionrecall.svg/525px-Precisionrecall.svg.png)
+
+:::
+::: {.column width="70%"}
+
+<br>
+
+| Term  | Meaning  |
+| :--------- | :------------------------------ |
+| **Accuracy** | How much does it get right overall? |
+| **Recall** | How much of the relevant cases does it find? |
+| **Precision** | How many of the found cases are relevant? |
+| **F1 Score** | Weighted average of precision and recall. |
+
+:::
+:::
+
+
+## 5. Evaluation - in `sklearn`
+
+
+<br><br>
+
+```{.python code-line-numbers="|1|1-6"}
+from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score
+
+accuracy_score(y_test, y_pred)
+recall_score(y_test, y_pred)
+precision_score(y_test, y_pred)
+f1_score(y_test, y_pred)
+
+```
+
+# [A Quick Introduction to Supervised Learning](https://colab.research.google.com/github/nicolaiberk/Imbalanced/blob/master/01_IntroSML_Tutorial.ipynb){preview-link=false target="_blank"}
+
+
+
+# Challenge!!!
+
+## Your Turn
+
+<br>
+
+- **Pair up** with your neighbor.
+- Open [this Colab notebook](https://colab.research.google.com/github/nicolaiberk/Imbalanced/blob/master/Challenge.ipynb){preview-link=false target="_blank"}.
+- You have **15 minutes** to design the best classifier.
+
+
+# Break Time
+
+![](https://media.giphy.com/media/S8DcNuvt1FUy31LUH6/giphy.gif){fig-align="center"}
+
+---
+
+### Imbalanced Data in Supervised Classification {.inverse}
+
+```{r}
+
+rnorm(1000) %>% 
+  cbind(X = ., Y = rnorm(1000)) %>% 
+  as.tibble() %>% 
+  mutate(group = (-7 + 4*X - 2*Y) > 0) %>% 
+  ggplot(aes(X, Y, col = group)) +
+  geom_point() +
+  geom_abline(slope = 2, intercept = -3.5, col = "black", lty = 2, size = 1.5) +
+  theme_void() +
+  scale_color_manual(values = themecols) +
+  theme(legend.position = "None") +
+  scale_y_continuous(breaks = NULL) +
+  scale_x_continuous(breaks = NULL) +
+  xlab("") + ylab("")
+
+```
+
+
+## Be me - in 2018
+
+<br>
+
+::: {.columns}
+::: {.column}
+
+- blissful pre-pandemic, -war, and -PhD life.
+- Collect some press releases.
+- **Annotate 1000 of them** to figure out which are about migration.
+
+:::
+::: {.column .fragment}
+
+#### **Only *28* about migration!**
+
+![](https://media1.giphy.com/media/7T33BLlB7NQrjozoRB/giphy.gif?cid=ecf05e47fs1pe5tc44bo69ui0dw2eu84tx8s8moddpu9l92p&rid=giphy.gif&ct=g)
+
+
+:::
+:::
+
+## *What* do you do?
+
+<br><br>
+
+
+::: {.columns}
+::: {.column}
+
+- Use the classifier anyway?
+- More annotation?
+- What else?
+
+
+:::
+::: {.column}
+```{r}
+
+round(rbeta(1000, 0.028, 1), 0 ) %>% 
+  as.tibble() %>% 
+  mutate(value = as.factor(value)) %>%
+  ggplot(aes(value, fill = value, group = value)) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values = themecols) +
+  theme_void() +
+  theme(legend.position = "None")
+  
+```
+
+:::
+:::
+
+## But what if we use the data like this?
+
+<br>
+
+::: {.columns}
+::: {.column width="30%"}
+
+![](https://media.giphy.com/media/hFROvOhBPQVRm/giphy.gif)
+
+:::
+::: {.column width="70%"}
+
+- **Best guess** in highly imbalanced data is simply the **most common outcome**.
+- Classifier won't find the cases we care about (also known as **very bad recall**).
+- See also [this script](https://github.com/nicolaiberk/Imbalanced/blob/master/ImbalancedProblem.ipynb){preview-link=false target="_blank"}.
+
+:::
+:::
+
+# Imbalanced Data as a *Weighting Problem*
+
+## Weighting
+
+<br>
+
+- Apparently, <mark>best accuracy is not what we're after</mark>.
+- Valuing certain cases more than others.
+- Classic example: credit card fraud.
+
+. . .
+
+$\rightarrow$ **We need to put more weight on the cases we care about.**
+
+## Weighing your Data
+
+<br>
+
+:::{.incremental}
+- Simple weighing/case duplication will get you fairly far.
+- Or, for neural networks, **adjust the loss function**.
+- Best performance for BoW-applications:
+:::
+
+. . .
+
+### **S**ynthetic **M**inority **O**versampling **TE**chnique
+
+## SMOTE
+
+:::{.columns}
+:::{.column width="30%"}
+
+![](https://imbalanced-learn.org/stable/_images/sphx_glr_plot_illustration_generation_sample_001.png)
+
+
+:::
+:::{.column width="70%"}
+
+create additional **synthetic** observations in training data by:
+
+1. Select observation in minority class.
+2. Find $k$ nearest neighbors (usually 5).
+3. Generate new case at a random distance in between the two.
+
+:::
+:::
+
+## SMOTE
+
+![](https://imbalanced-learn.org/stable/_images/sphx_glr_plot_illustration_generation_sample_001.png){fig-align="center" width="80%"}
+
+
+## SMOTE in Python
+
+
+```{.python}
+from imblearn.over_sampling import SMOTE
+X_resample, y_resample = SMOTE(sampling_strategy = 0.2
+  ).fit_resample(X, y)
+```
+. . .
+
+![](vis/SMOTE_example.png){fig-align="center" width="80%"}
+
+## Pros and Cons SMOTE
+
+<br>
+
+**Pros**
+
+- Can be applied **after data collection**
+- Computationally easy
+- Can be combined with [undersampling](https://imbalanced-learn.org/dev/references/combine.html)
+- [Outperforms](https://arxiv.org/abs/1106.1813) pure undersampling and NaiveBayes with adjusted priors.
+
+## Pros and Cons SMOTE
+
+<br>
+
+**Cons**
+
+- Does not add real information.
+- We have to be [careful with validation](https://medium.com/lumiata/cross-validation-for-imbalanced-datasets-9d203ba47e8).
+- Likely <mark>biased</mark> classification (more on this later).
+
+# [SMOTE Script](https://colab.research.google.com/github/nicolaiberk/Imbalanced/blob/master/02b_SMOTE_Tutorial.ipynb){preview-link=false target="_blank"}
+
+
+## Recharge Pause
+
+![](https://media4.giphy.com/media/jds5Lfam0b8WjFeF7l/giphy.gif?cid=ecf05e47pekgdmhn2xw5mn4grku8c9fmgqv1rwwsru4yesqu&ep=v1_gifs_search&rid=giphy.gif&ct=g){fig-align="center"}
+
+
+# Imbalanced Data as a *Sampling Problem*
+
+---
+
+### What if we address imbalance **before** annotation?
+
+<br>
+
+Idea:
+
+- Use classifier to find **most informative** samples to code.
+- Iteratively train the classifier.
+- More efficient training by smart sampling.
+
+. . .
+
+$\rightarrow$ ***Active* Learning**
+
+
+## Active Learning
+
+![](vis/AL_Example.png)
+
+## Active Learning - Application
+
+::: {.incremental}
+1. **Cold Initialisation** with small random sample
+2. **Hot Phase**:
+   1.  Generate uncertainty estimates for unlabelled data.
+   2.  Sample most informative observation(s).
+   3.  Annotate.
+   4.  Retrain classifier.
+   5.  Repeat.
+:::
+
+## Active Learning - Application
+
+![](vis/AL_Example.png)
+
+## Active Learning - Querying Strategies
+
+<br>
+
+1. **Uncertainty/Margin Sampling**
+   + Select samples with most uncertain prediction.
+2. Query by Committee
+   + Use several classifiers, look at disagreement.
+3. Expected Model Change
+   + Add unlabelled observation to model using expected label, sample those which affect model most.
+
+
+::: {.aside}
+See [Miller et al. 2020](http://www-personal.umich.edu/~wmebane/active-learning-approaches-4-18-2018.pdf) for more info.
+:::
+
+## Active Learning in Python
+
+<br>
+
+```{.python code-line-numbers="|4-8|10-11|13-14"}
+from modAL.models import ActiveLearner
+from modAL.uncertainty import uncertainty_sampling
+
+# initializing the learner
+learner = ActiveLearner(
+    estimator=LogReg(max_iter=1000),
+    X_training=X_start, y_training=y_start
+    )
+
+# query for label
+query_idx, query_inst = learner.query(X_train)
+
+# supply new label for queried observation
+learner.teach(X_train[query_idx], y_new)
+```
+
+## Pros and Cons of Active Learning
+
+<br>
+
+**Pros**
+
+- We add **real information** to the model.
+- Can be part of annotation workflow (more on this later).
+- Can be combined with SMOTE.
+
+## Pros and Cons of Active Learning
+
+<br>
+
+
+**Cons**
+
+- Computationally demanding.
+- Have to have infrastructure for annotation in place (but there are nice [packages](https://rubrix.readthedocs.io/en/stable/tutorials/05-active_learning.html) for this).
+- Likely <mark>biased</biased>.
+- "Cold Start Problem".
+- Can perform **worse** ([Karamcheti et al 2021](https://arxiv.org/pdf/2107.02331.pdf))
+
+
+## Alternatives to Active Learning
+
+<br><br>
+
+- Guided Search ([Attenberg and Provost 2010](https://dl.acm.org/doi/pdf/10.1145/1835804.1835859)) (see eg [notebook](https://colab.research.google.com/github/nicolaiberk/Imbalanced/blob/master/02a_DictionarySampling_Solution.ipynb) on stratified dictionary sampling).
+- Leveraging domain expertise and embedding representations ([Dror et al 2023](https://www.tandfonline.com/doi/pdf/10.1080/19312458.2023.2182278))
+
+# [Active Learning Script](https://colab.research.google.com/github/nicolaiberk/Imbalanced/blob/master/02c_ActiveLearning_Tutorial.ipynb){preview-link=false target="_blank"}
+
+# Questions?
+
+# Current Issues and Debates
+
+
+## Transfer Learning [Laurer et al](https://osf.io/74b8k/download)
+
+<br>
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+- Transformer Models trained on **N**atural **L**anguage **I**nference tasks.
+- Zero-shot capabilities.
+- Require less training data than regular BERT.
+
+:::
+::: {.column width="50%"}
+
+![](vis/transfer_learning.png){fig-align="center" width="100%"}
+
+:::
+:::
+
+## Transfer Learning ([Laurer et al](https://osf.io/74b8k/download))
+
+<br><br>
+
+> "prior  <mark>‘task knowledge’  [...]  reduces  the  need  for  data  for  minority  classes</mark>.  In  fact,  BERT-NLI  can already predict a class without a single class example in the data (‘zero-shot classification’). [...] BERT-NLI is useful in situations where little and imbalanced data is available (<= 1000)"
+
+## Transfer Learning ([Laurer et al](https://osf.io/74b8k/download))
+
+<br>
+
+### 'task knowledge' can be many things:
+
+- embeddings
+- pre-trained transformer
+- task-specific domain knowledge
+
+<!-- ## What about GPT?
+
+<br>
+
+- Newest language models severely **reduce the cost of annotation** with zero-shot classification.
+- However, still necessary to assess performance.
+- Additional training will often be needed.
+
+### Dealing with Imbalanced Data is mostly about reducing annotation costs! -->
+
+
+## Bias: Problem
+
+<br>
+
+- By oversampling/overweighting, we overrepresent minority class.
+- Data is **not** a random, unbiased sample of the population $\rightarrow$ **bias!**
+- Bias generally under-appreciated problem in ML ([Fong and Tyler 2020](https://www.cambridge.org/core/journals/political-analysis/article/machine-learning-predictions-as-regression-covariates/462A74A46A97C20A17CF640BDA72B826)).
+
+
+## Bias: Solutions?
+
+<br>
+
+- [Fong and Tyler (2020)](https://www.cambridge.org/core/journals/political-analysis/article/machine-learning-predictions-as-regression-covariates/462A74A46A97C20A17CF640BDA72B826) propose **bias-corrected** regression models using ML predictions as instrument for true values.
+- Some work on image classification addresses sampling bias in active learning using [reweighting](https://arxiv.org/abs/2101.11665) or [improved sampling strategies](https://arxiv.org/abs/2109.06321).
+
+### Generally, we don't know much about the extent of bias in classifiers on oversampled data. 😱
+
+
+
+## Conclusion
+
+::: {.callout-important}
+
+## Imbalance is a widespread problem in ML
+
+- Reduces classifier performance.
+- Increases annotation costs.
+
+:::
+
+. . .
+
+::: {.callout-tip}
+## Sampling & weighting are complimentary
+
++ Sample with active learner, potentially initialize with guided sampling.
++ Further reduce imbalance with SMOTE,
++ or use transfer learner.
+
+:::
+
+. . .
+
+::: {.callout-warning}
+
+## We don't know how biased our estimates are
+
+$\rightarrow$ More research needed!
+
+:::
+
+
+
+
+# Thank you!
